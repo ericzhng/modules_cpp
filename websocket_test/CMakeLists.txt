@@ -1,3 +1,4 @@
+
 cmake_minimum_required(VERSION 3.30)
 project(WebSocketServer)
 
@@ -9,14 +10,12 @@ if(CMAKE_TOOLCHAIN_FILE STREQUAL "")
     message(FATAL_ERROR "Please define CMAKE_TOOLCHAIN_FILE to point to vcpkg.cmake")
 endif()
 
-# Find Boost
+# Find Boost WebSocket++
 find_package(boost_asio REQUIRED CONFIG)
-
-# Find WebSocket++
 find_package(websocketpp CONFIG REQUIRED)
 
 # Create executable
-add_executable(WebSocketServer main.cpp server.cpp server.hpp)
+add_executable(WebSocketServer src/main.cpp src/WebSocketServer.cpp src/WebSocketServer.hpp)
 
 # Link Boost and WebSocket++
 target_include_directories(WebSocketServer PRIVATE ${Boost_INCLUDE_DIRS} ${websocketpp_INCLUDE_DIRS})

@@ -1,5 +1,5 @@
 
-#include "server.hpp"
+#include "WebSocketServer.hpp"
 
 #include <stdexcept>
 #include <cstdio>   // for open and pclose

@@ -6,10 +6,10 @@ REM Initialize Conda (only needed if 'conda' is not in PATH)
 CALL "%ANACONDA_PATH%\Scripts\activate.bat" "%ANACONDA_PATH%"
 
 REM Activate the virtual environment (replace 'myenv' with your environment name)
-CALL conda activate env_test
+CALL conda activate torch
 
 REM Run the Python script
-python python/client.py
+python python_reader.py
 
 REM (Optional) Deactivate the environment
 CALL conda deactivate

@@ -1,5 +1,5 @@
 
-#include "server.hpp"
+#include "WebSocketServer.hpp"
 #include <iostream>
 
 int main() {
