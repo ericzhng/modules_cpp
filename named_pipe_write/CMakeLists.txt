@@ -6,9 +6,9 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Use vcpkg for package management
-if(CMAKE_TOOLCHAIN_FILE STREQUAL "")
-    message(FATAL_ERROR "Please define CMAKE_TOOLCHAIN_FILE to point to vcpkg.cmake")
-endif()
+# if(CMAKE_TOOLCHAIN_FILE STREQUAL "")
+    # message(FATAL_ERROR "Please define CMAKE_TOOLCHAIN_FILE to point to vcpkg.cmake")
+# endif()
 
 # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /utf-8")
 
