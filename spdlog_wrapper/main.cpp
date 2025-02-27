@@ -6,12 +6,17 @@ void test1() {
 }
 
 void test2() {
+    tLog::Error("An warning occurred: {}", 404);
+}
+
+void test3() {
     tLog::Warn("An warning occurred: {}", 404);
 }
 
 void test_wrap() {
     test1();
-    test2();
+    //test2();
+    //test3();
 }
 
 int main() {

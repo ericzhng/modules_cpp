@@ -18,6 +18,7 @@
 
 #include <cpptrace/cpptrace.hpp>
 #include <cpptrace/formatting.hpp>
+#include <cpptrace/from_current.hpp>
 
 class tLog
 {
@@ -111,8 +112,10 @@ public:
                 .paths(cpptrace::formatter::path_mode::full)
                 .snippets(true);
 
-            logger_console->warn(formatter.format(cpptrace::generate_trace(1), true));
-            logger_file->warn(formatter.format(cpptrace::generate_trace(1), false));
+            auto tt = cpptrace::generate_trace(1);
+
+            logger_console->warn(formatter.format(tt, true));
+            logger_file->warn(formatter.format(tt, false));
         }
     }
 
@@ -130,8 +133,10 @@ public:
 			.paths(cpptrace::formatter::path_mode::full)
             .snippets(true);
 
-        logger_console->error(formatter.format(cpptrace::generate_trace(1), true));
-        logger_file->error(formatter.format(cpptrace::generate_trace(1), false));
+        auto tt = cpptrace::generate_raw_trace(1).resolve();
+
+        logger_console->error(formatter.format(tt, true));
+        logger_file->error(formatter.format(tt, false));
     }
 
 };

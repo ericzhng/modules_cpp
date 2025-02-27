@@ -11,7 +11,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # endif()
 
 set(EXTERN_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../extern")
-set(CMAKE_PREFIX_PATH "${EXTERN_PATH}/eigen-3.4.0/cmake" ${CMAKE_PREFIX_PATH})
+set(EIGEN_INCLUDE_DIRS "${EXTERN_PATH}/eigen-3.4.0")  # Set this to your Eigen folder path
+
+# set(CMAKE_PREFIX_PATH "${EXTERN_PATH}/eigen-3.4.0/cmake" ${CMAKE_PREFIX_PATH})
+# find_package(Eigen3 REQUIRED)
 
 # set(MPI_INCLUDE_DIR "C:/Program Files/Microsoft MPI/include")
 # set(MPI_LIBRARIES "C:/Program Files/Microsoft MPI/lib/msmpi.lib")
@@ -20,11 +23,10 @@ find_package(MPI REQUIRED)
 find_package(OpenMP REQUIRED)
 find_package(MKL REQUIRED)
 
-# Add Eigen to your project (adjust path as necessary)
-set(EIGEN_INCLUDE_DIRS "${EXTERN_PATH}/eigen-3.4.0")  # Set this to your Eigen folder path
-set(MKL_INCLUDE_DIRS "C:/Program Files (x86)/Intel/oneAPI/mkl/latest/include")
+# set(MKL_INCLUDE_DIRS "C:/Program Files (x86)/Intel/oneAPI/mkl/latest/include")
 
-include_directories(${MPI_INCLUDE_PATH} ${EIGEN_INCLUDE_DIRS})
+# Add Eigen to your project (adjust path as necessary)
+include_directories(${EIGEN_INCLUDE_DIRS})
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /openmp")
 
