@@ -8,7 +8,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(EXTERN_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../extern")
 get_filename_component(EXTERN_PATH "${EXTERN_PATH}" ABSOLUTE)
 
-# set(pybind11_DIR "${EXTERN_PATH}/pybind11")
+set(pybind11_DIR "${EXTERN_PATH}/pybind11")
 
 # Use vcpkg for package management
 if(CMAKE_TOOLCHAIN_FILE STREQUAL "")
@@ -36,9 +36,9 @@ add_library(ffi SHARED ffi/mycpp.cpp
 find_package(Boost REQUIRED COMPONENTS python)
 
 # Create executable
-add_library(boost_python SHARED boost-python/mycpp.cpp
+add_library(boostIO SHARED boostIO/mycpp.cpp
 				)
-target_link_libraries(boost_python PRIVATE Boost::python)
+target_link_libraries(boostIO PRIVATE Boost::python)
 
 
 #============================================== #
@@ -51,9 +51,10 @@ message(STATUS "Python Lib: ${Python_LIBRARIES}")
 
 # Create executable
 add_library(swig_ex SHARED swig/mycpp_wrap.cxx
-				)
+			)
+			
 include_directories("${Python_INCLUDE_DIRS}")
-target_link_libraries(swig_ex PRIVATE ${Python_LIBRARIES})
+target_link_libraries(swig_ex PRIVATE Python3::Python)
 
 
 #============================================== #
@@ -63,18 +64,25 @@ target_link_libraries(swig_ex PRIVATE ${Python_LIBRARIES})
 # set(Python_INCLUDE_DIR "C:/Software/anaconda3/envs/env_pipe/include" CACHE PATH "Python include directory")
 # set(Python_LIBRARY "C:/Software/anaconda3/envs/env_pipe/libs/python312.lib" CACHE FILEPATH "Python library")
 
-find_package(Python COMPONENTS Interpreter Development)
-find_package(pybind11 REQUIRED)
+# find_package(Python3 COMPONENTS Interpreter Development)
+
+# Create executable
+add_library(pybind11_ex0 SHARED pybind11/mycpp.cpp
+			)
+target_include_directories(pybind11_ex0 PRIVATE "${pybind11_DIR}/include")
+target_link_libraries(pybind11_ex0 PRIVATE Python3::Python)
+
 
 # pybind11 method:
-pybind11_add_module(pybind11_ex pybind11/mycpp.cpp)
+find_package(pybind11 REQUIRED)
+pybind11_add_module(pybind11_ex1 pybind11/mycpp.cpp)
 
-# # Python method:
-# Python_add_library(MyModule2 pybind11/mycpp.cpp)
-# target_link_libraries(MyModule2 pybind11::headers)
-# set_target_properties(MyModule2 PROPERTIES
-	# INTERPROCEDURAL_OPTIMIZATION ON
-	# CXX_VISIBILITY_PRESET ON
-	# VISIBILITY_INLINES_HIDDEN ON
-# )
 
+# Python method:
+Python_add_library(pybind11_ex2 pybind11/mycpp.cpp)
+target_link_libraries(pybind11_ex2 PRIVATE pybind11::headers)
+set_target_properties(pybind11_ex2 PROPERTIES
+	INTERPROCEDURAL_OPTIMIZATION ON
+	CXX_VISIBILITY_PRESET ON
+	VISIBILITY_INLINES_HIDDEN ON
+)

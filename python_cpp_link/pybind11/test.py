@@ -5,5 +5,5 @@
 # import sys
 # sys.path.append(dllLoc)
 
-import pybind11_ex
-print(pybind11_ex.add(2, 3))  # Output: 5
+import pybind11_ex0
+print(pybind11_ex0.add(2, 3))  # Output: 5
