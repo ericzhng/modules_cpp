@@ -1,13 +1,12 @@
 
 import os
 dllLoc = os.path.abspath("./build/Release")
+print(dllLoc)
 
 import sys
 sys.path.append(dllLoc)
-import sys
-print(sys.path)
 
-import boost_python
+import mycpp2
 
-g = boost_python.Greeter()
-g.say_hello("Bob")
+greeter = mycpp2.Greeter()
+greeter.say_hello("Alice")

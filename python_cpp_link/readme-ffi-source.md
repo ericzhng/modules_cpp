@@ -1,5 +1,4 @@
 
-
 # # Set the C source code (can be in a separate file)
 # ffi.set_source("mycpp_", """
 # #include <iostream>

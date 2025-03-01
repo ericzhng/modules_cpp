@@ -9,7 +9,7 @@ public:
 };
 
 // Expose the class to Python
-BOOST_PYTHON_MODULE(mycpp) {
+BOOST_PYTHON_MODULE(myboostmodule) {
     using namespace boost::python;
     class_<Greeter>("Greeter")
         .def("say_hello", &Greeter::say_hello);
