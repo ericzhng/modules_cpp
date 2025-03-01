@@ -66,8 +66,8 @@ int main(int argc, char *argv[]) {
     int Nx = 1;  // number of elements in x-direction
     int Ny = 1;  // number of elements in y-direction
 
-    double Lx = 1.0;  // length in x-direction
-    double Ly = 1.0;  // length in y-direction
+    double Lx = 2.0;  // length in x-direction
+    double Ly = 2.0;  // length in y-direction
 
     double f = 100.0;  // force applied
 

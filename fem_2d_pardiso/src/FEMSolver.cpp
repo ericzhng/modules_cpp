@@ -40,7 +40,8 @@ Eigen::MatrixXd FEMSolver::unit_stiffness(const Eigen::Vector2d &p1, const Eigen
     D *= (E / (1 - nu * nu));
 
     // Compute element stiffness matrix Ke = t * A * B^T * D * B
-    Eigen::MatrixXd Ke = thick * A * (B.transpose() * D * B);
+    // Eigen::MatrixXd Ke = thick * A * (B.transpose() * D2 * B);
+    Eigen::MatrixXd Ke = A * (B.transpose() * B);
 
     return Ke;
 }
@@ -119,24 +120,29 @@ void FEMSolver::assemble()
 
 void FEMSolver::solve()
 {
-    void* pt[64] = { nullptr };
-    MKL_INT maxfct = 1, mnum = 1;
-    MKL_INT mtype = 11; // Real and nonsymmetric matrix
+    /* Matrix data. */
+    MKL_INT n = 5;
+    MKL_INT ia[6] = { 1, 4, 6, 9, 12, 14 };
+    MKL_INT ja[13] = { 1, 2, 4,
+        1, 2,
+        3, 4, 5,
+        1, 3, 4,
+        2, 5 };
 
-    MKL_INT phase;
-    MKL_INT nsize = K.get_rows();
+    double a[18] = { 1.0, -1.0, -3.0,
+        -2.0, 5.0,
+        4.0, 6.0, 4.0,
+        -4.0, 2.0, 7.0,
+        8.0, -5.0 };
 
-    MKL_INT nrhs = 1, error = 0;
+    /* RHS and solution vectors. */
+    double b[5], x[5];
 
-    // Solver-specific parameters that control various aspects of the Pardiso solver
-    MKL_INT iparm[64] = { 0 };
-    iparm[0] = 0;   // Solver default parameters overridden with provided by iparm
-    /*
-    iparm[1] = 0;   // You can control the parallel execution of the solver, The minimum degree algorithm
-    iparm[5] = 0;  // Write solution into x
-    iparm[10] = 1; // Use nonsymmetric permutation and scaling MPS
-    iparm[34] = 1;  // Zero-based indexing: columns and rows indexing in arrays ia, ja, and perm starts from 0 (C-style indexing).
-    */
+    for (MKL_INT i = 0; i < n; i++) {
+        b[i] = 1;
+    }
+
+
     std::vector<MKL_INT> ia_long(K.row_ptr.size());
     std::vector<MKL_INT> ja_long(K.col_ind.size());
 
@@ -147,11 +153,74 @@ void FEMSolver::solve()
     std::transform(K.col_ind.begin(), K.col_ind.end(), ja_long.begin(),
         [](int val) { return static_cast<long long>(val); });
 
-    phase = 13; // Analysis, numerical factorization, solve
-    std::vector<double> tt(K.val);
+    MKL_INT nsize = K.get_rows();
 
-    pardiso(pt, &maxfct, &mnum, &mtype, &phase, &nsize, &tt[0], &ia_long[0], &ja_long[0],
-        nullptr, &nrhs, iparm, nullptr, F.data(), U.data(), &error);
+    std::vector<double> vals(K.val);
+
+    MKL_INT mtype = 11; /* Real unsymmetric matrix */
+    MKL_INT nrhs = 1; /* Number of right hand sides. */
+    /* Internal solver memory pointer pt, */
+    /* 32-bit: int pt[64]; 64-bit: long int pt[64] */
+    /* or void *pt[64] should be OK on both architectures */
+    void* pt[64];
+
+    /* Pardiso control parameters. */
+    MKL_INT iparm[64];
+    MKL_INT maxfct, mnum, phase, error, msglvl;
+
+    /* Auxiliary variables. */
+    MKL_INT i;
+    double ddum; /* Double dummy */
+    MKL_INT idum; /* Integer dummy. */
+
+    /* -------------------------------------------------------------------- */
+    /* .. Setup Pardiso control parameters. */
+    /* -------------------------------------------------------------------- */
+    for (i = 0; i < 64; i++) {
+        iparm[i] = 0;
+    }
+    iparm[0] = 1; /* No solver default */
+    iparm[1] = 2; /* Fill-in reordering from METIS */
+    /* Numbers of processors, value of OMP_NUM_THREADS */
+    iparm[2] = 1;
+    iparm[3] = 0; /* No iterative-direct algorithm */
+    iparm[4] = 0; /* No user fill-in reducing permutation */
+    iparm[5] = 0; /* Write solution into x */
+    iparm[6] = 0; /* Not in use */
+    iparm[7] = 2; /* Max numbers of iterative refinement steps */
+    iparm[8] = 0; /* Not in use */
+    iparm[9] = 13; /* Perturb the pivot elements with 1E-13 */
+    iparm[10] = 1; /* Use nonsymmetric permutation and scaling MPS */
+    iparm[11] = 0; /* Not in use */
+    iparm[12] = 0; /* Not in use */
+    iparm[13] = 0; /* Output: Number of perturbed pivots */
+    iparm[14] = 0; /* Not in use */
+    iparm[15] = 0; /* Not in use */
+    iparm[16] = 0; /* Not in use */
+    iparm[17] = -1; /* Output: Number of nonzeros in the factor LU */
+    iparm[18] = -1; /* Output: Mflops for LU factorization */
+    iparm[19] = 0; /* Output: Numbers of CG Iterations */
+    maxfct = 1; /* Maximum number of numerical factorizations. */
+    mnum = 1; /* Which factorization to use. */
+    msglvl = 1; /* Print statistical information in file */
+    error = 0; /* Initialize error flag */
+    /* -------------------------------------------------------------------- */
+    /* .. Initialize the internal solver memory pointer. This is only */
+    /* necessary for the FIRST call of the PARDISO solver. */
+    /* -------------------------------------------------------------------- */
+    for (i = 0; i < 64; i++) {
+        pt[i] = 0;
+    }
+
+    /*
+    iparm[34] = 1;  // Zero-based indexing: columns and rows indexing in arrays ia, ja, and perm starts from 0 (C-style indexing).
+    */
+
+    phase = 13; // Analysis, numerical factorization, solve
+
+    pardiso(pt, &maxfct, &mnum, &mtype, &phase, 
+        &nsize, a, ia, ja, &idum, &nrhs,
+        iparm, &msglvl, b, x, &error);
 
     if (error != 0) {
         std::cerr << "PARDISO error: " << error << std::endl;

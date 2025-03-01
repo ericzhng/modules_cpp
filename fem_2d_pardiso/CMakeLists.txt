@@ -36,3 +36,29 @@ add_executable(FEMSolver src/main.cpp src/FEMSolver.cpp src/FEMSolver.h)
 # Link Boost and WebSocket++
 target_include_directories(FEMSolver PRIVATE ${MKL_INCLUDE_DIRS})
 target_link_libraries(FEMSolver ${MPI_LIBRARIES} MKL::MKL MPI::MPI_CXX OpenMP::OpenMP_CXX)
+
+# --------------------------------------- #
+# Create executable
+add_executable(panua_test pardiso/test.cpp)
+
+# Link Boost and WebSocket++
+target_include_directories(panua_test PRIVATE "C:\\tools\\pardiso\\include")
+target_link_libraries(panua_test ${MPI_LIBRARIES} "C:\\tools\\pardiso\\lib\\libpardiso.lib" OpenMP::OpenMP_CXX)
+
+# --------------------------------------- #
+# Create executable
+add_executable(pardiso_unsym_c pardiso/pardiso_unsym_c.cpp)
+set_target_properties(pardiso_unsym_c PROPERTIES LINKER_LANGUAGE CXX)
+
+# Link Boost and WebSocket++
+target_include_directories(pardiso_unsym_c PRIVATE ${MKL_INCLUDE_DIRS})
+target_link_libraries(pardiso_unsym_c ${MPI_LIBRARIES} MKL::MKL MPI::MPI_CXX OpenMP::OpenMP_CXX)
+
+# --------------------------------------- #
+# Create executable
+add_executable(pardiso_sym_c pardiso/pardiso_sym_c.cpp)
+set_target_properties(pardiso_sym_c PROPERTIES LINKER_LANGUAGE CXX)
+
+# Link Boost and WebSocket++
+target_include_directories(pardiso_sym_c PRIVATE ${MKL_INCLUDE_DIRS})
+target_link_libraries(pardiso_sym_c ${MPI_LIBRARIES} MKL::MKL MPI::MPI_CXX OpenMP::OpenMP_CXX)
