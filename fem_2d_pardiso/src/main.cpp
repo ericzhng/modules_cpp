@@ -42,7 +42,7 @@ int main(int argc, char *argv[]) {
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
     // Set the number of threads to 4 programmatically
-    omp_set_num_threads(1);
+    omp_set_num_threads(4);
 
     // Set OpenMP threads based on available cores
     int num_threads = 0;
@@ -63,11 +63,11 @@ int main(int argc, char *argv[]) {
 
 
     // Set parameters for FEM problem (grid size, domain size, force)
-    int Nx = 1;  // number of elements in x-direction
-    int Ny = 1;  // number of elements in y-direction
+    int Nx = 10;  // number of elements in x-direction
+    int Ny = 10;  // number of elements in y-direction
 
-    double Lx = 2.0;  // length in x-direction
-    double Ly = 2.0;  // length in y-direction
+    double Lx = 1.0;  // length in x-direction
+    double Ly = 1.0;  // length in y-direction
 
     double f = 100.0;  // force applied
 

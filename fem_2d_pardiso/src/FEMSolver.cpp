@@ -39,8 +39,8 @@ Eigen::MatrixXd FEMSolver::unit_stiffness(const Eigen::Vector2d &p1, const Eigen
         0, 0, (1 - nu) / 2;
     D *= (E / (1 - nu * nu));
 
-    // Compute element stiffness matrix Ke = t * A * B^T * D * B
-    // Eigen::MatrixXd Ke = thick * A * (B.transpose() * D2 * B);
+    // Compute element stiffness matrix
+    // Eigen::MatrixXd Ke = thick * A * (B.transpose() * D * B);
     Eigen::MatrixXd Ke = A * (B.transpose() * B);
 
     return Ke;
@@ -63,9 +63,6 @@ void FEMSolver::assemble()
 
         Eigen::MatrixXd Ke = unit_stiffness( nodes[elem(0)], nodes[elem(1)], nodes[elem(2)] );
 
-        // Print the matrix
-        std::cout << "Ke:\n" << Ke << std::endl;
-
         #pragma omp critical
         for (int i = 0; i < 3; ++i)
 		{
@@ -83,8 +80,6 @@ void FEMSolver::assemble()
 
     // Apply force
     for (int i = 0; i < numNodes; ++i) {
-
-        std::cout << nodes[i].y() << "\n";
 
         if (abs(nodes[i].y()) < 1E-2) {
             F(2 * i + 1) = f;
@@ -104,14 +99,8 @@ void FEMSolver::assemble()
 		}
 	}
 
-	K.print_rows();
-
     // Finalize CSR structure
     K.finalize();
-
-    K.print();
-
-    std::cout << F << std::endl;
 
     // MPI synchronization for shared nodes
     MPI_Allreduce(MPI_IN_PLACE, F.data(), numNodes, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
@@ -120,28 +109,7 @@ void FEMSolver::assemble()
 
 void FEMSolver::solve()
 {
-    /* Matrix data. */
-    MKL_INT n = 5;
-    MKL_INT ia[6] = { 1, 4, 6, 9, 12, 14 };
-    MKL_INT ja[13] = { 1, 2, 4,
-        1, 2,
-        3, 4, 5,
-        1, 3, 4,
-        2, 5 };
-
-    double a[18] = { 1.0, -1.0, -3.0,
-        -2.0, 5.0,
-        4.0, 6.0, 4.0,
-        -4.0, 2.0, 7.0,
-        8.0, -5.0 };
-
-    /* RHS and solution vectors. */
-    double b[5], x[5];
-
-    for (MKL_INT i = 0; i < n; i++) {
-        b[i] = 1;
-    }
-
+    MKL_INT nsize = K.get_rows();
 
     std::vector<MKL_INT> ia_long(K.row_ptr.size());
     std::vector<MKL_INT> ja_long(K.col_ind.size());
@@ -152,11 +120,7 @@ void FEMSolver::solve()
 
     std::transform(K.col_ind.begin(), K.col_ind.end(), ja_long.begin(),
         [](int val) { return static_cast<long long>(val); });
-
-    MKL_INT nsize = K.get_rows();
-
-    std::vector<double> vals(K.val);
-
+  
     MKL_INT mtype = 11; /* Real unsymmetric matrix */
     MKL_INT nrhs = 1; /* Number of right hand sides. */
     /* Internal solver memory pointer pt, */
@@ -200,9 +164,11 @@ void FEMSolver::solve()
     iparm[17] = -1; /* Output: Number of nonzeros in the factor LU */
     iparm[18] = -1; /* Output: Mflops for LU factorization */
     iparm[19] = 0; /* Output: Numbers of CG Iterations */
+    iparm[34] = 1;  // Zero-based indexing: columns and rows indexing in arrays ia, ja, and perm starts from 0 (C-style indexing).
+
     maxfct = 1; /* Maximum number of numerical factorizations. */
     mnum = 1; /* Which factorization to use. */
-    msglvl = 1; /* Print statistical information in file */
+    msglvl = 0; /* Print statistical information in file */
     error = 0; /* Initialize error flag */
     /* -------------------------------------------------------------------- */
     /* .. Initialize the internal solver memory pointer. This is only */
@@ -212,15 +178,11 @@ void FEMSolver::solve()
         pt[i] = 0;
     }
 
-    /*
-    iparm[34] = 1;  // Zero-based indexing: columns and rows indexing in arrays ia, ja, and perm starts from 0 (C-style indexing).
-    */
-
     phase = 13; // Analysis, numerical factorization, solve
 
     pardiso(pt, &maxfct, &mnum, &mtype, &phase, 
-        &nsize, a, ia, ja, &idum, &nrhs,
-        iparm, &msglvl, b, x, &error);
+        &nsize, K.val.data(), ia_long.data(), ja_long.data(), &idum, &nrhs,
+        iparm, &msglvl, F.data(), U.data(), &error);
 
     if (error != 0) {
         std::cerr << "PARDISO error: " << error << std::endl;
@@ -228,7 +190,9 @@ void FEMSolver::solve()
     }
 
     phase = -1; // Release all internal memory for all matrices
-    pardiso(pt, &maxfct, &mnum, &mtype, &phase, &nsize, nullptr, nullptr, nullptr, nullptr, &nrhs, iparm, nullptr, nullptr, nullptr, &error);
+    pardiso(pt, &maxfct, &mnum, &mtype, &phase, 
+        &nsize, nullptr, nullptr, nullptr, &idum, &nrhs,
+        iparm, &msglvl, nullptr, nullptr, &error);
 
     if (error != 0) {
         std::cerr << "PARDISO error: " << error << std::endl;

@@ -42,8 +42,12 @@ target_link_libraries(FEMSolver ${MPI_LIBRARIES} MKL::MKL MPI::MPI_CXX OpenMP::O
 add_executable(panua_test pardiso/test.cpp)
 
 # Link Boost and WebSocket++
-target_include_directories(panua_test PRIVATE "C:\\tools\\pardiso\\include")
-target_link_libraries(panua_test ${MPI_LIBRARIES} "C:\\tools\\pardiso\\lib\\libpardiso.lib" OpenMP::OpenMP_CXX)
+target_include_directories(panua_test PRIVATE "C:/tools/pardiso/include")
+target_link_libraries(panua_test ${MPI_LIBRARIES} "C:/tools/pardiso/lib/libpardiso.lib" OpenMP::OpenMP_CXX)
+add_custom_command(TARGET panua_test
+  POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy "C:/tools/pardiso/lib/libpardiso.dll" ${CMAKE_BINARY_DIR}/.
+)
 
 # --------------------------------------- #
 # Create executable
