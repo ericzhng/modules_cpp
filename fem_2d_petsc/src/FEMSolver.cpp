@@ -57,27 +57,36 @@ void FEMSolver::assemble()
     F.setZero(numNodes * 2);
     U.setZero(numNodes * 2);
 
-    // Parallelize element matrix computation with OpenMP
-    //#pragma omp parallel for num_threads(num_threads)
-    for (int e = 0; e < elements.size(); ++e) {
-		auto elem = elements[e];
+    #pragma omp parallel
+    {
+        CSRMatrix K_local(numNodes * 2);
+        K_local.reserve(elements.size() * 18);
 
-        Eigen::MatrixXd Ke = unit_stiffness( nodes[elem(0)], nodes[elem(1)], nodes[elem(2)] );
+        #pragma omp for schedule(dynamic)
+        for (int e = 0; e < elements.size(); ++e) {
+            auto elem = elements[e];
+            Eigen::MatrixXd Ke = unit_stiffness(nodes[elem(0)], nodes[elem(1)], nodes[elem(2)]);
+            for (int i = 0; i < 3; ++i) {
+                int row = elem(i);
+                for (int j = 0; j < 3; ++j) {
+                    int col = elem(j);
+                    K_local.insert(2 * row, 2 * col, Ke(2 * i, 2 * j));
+                    K_local.insert(2 * row + 1, 2 * col, Ke(2 * i + 1, 2 * j));
+                    K_local.insert(2 * row, 2 * col + 1, Ke(2 * i, 2 * j + 1));
+                    K_local.insert(2 * row + 1, 2 * col + 1, Ke(2 * i + 1, 2 * j + 1));
+                }
+            }
+        }
 
-        //#pragma omp critical
-        for (int i = 0; i < 3; ++i)
-		{
-            int row = elem(i);
-			for (int j = 0; j < 3; ++j)
-			{
-				int col = elem(j);
-				K.insert(2 * row, 2 * col, Ke(2 * i, 2 * j));
-				K.insert(2 * row + 1, 2 * col, Ke(2 * i + 1, 2 * j));
-				K.insert(2 * row, 2 * col + 1, Ke(2 * i, 2 * j + 1));
-				K.insert(2 * row + 1, 2 * col + 1, Ke(2 * i + 1, 2 * j + 1));
-			}
-		}
-	}
+        #pragma omp critical
+        {
+            for (int i = 0; i < numNodes * 2; ++i) {
+                for (const auto& entry : K_local.row_vec[i]) {
+                    K.insert(i, entry.first, entry.second);
+                }
+            }
+        }
+    }
 
     // Apply force
     for (int i = 0; i < numNodes; ++i) {
@@ -99,6 +108,64 @@ void FEMSolver::assemble()
 			F(2 * i + 1) = 0;
 		}
 	}
+
+    // Communicate ghost node data for K and F
+    std::vector<MPI_Request> requests;
+    for (const auto& [neighbor, ghost_indices] : mesh.ghost_map) {
+        std::vector<double> send_vals, send_F;
+        std::vector<int> send_cols;
+        for (int i : ghost_indices) {
+            int row_start = K.row_ptr[2 * i];
+            int row_end = K.row_ptr[2 * i + 1];
+            for (int k = row_start; k < row_end; ++k) {
+                send_cols.push_back(K.col_ind[k]);
+                send_vals.push_back(K.val[k]);
+            }
+            row_start = K.row_ptr[2 * i + 1];
+            row_end = K.row_ptr[2 * i + 2];
+            for (int k = row_start; k < row_end; ++k) {
+                send_cols.push_back(K.col_ind[k]);
+                send_vals.push_back(K.val[k]);
+            }
+            send_F.push_back(F(2 * i));
+            send_F.push_back(F(2 * i + 1));
+        }
+
+        MPI_Request req;
+        MPI_Isend(send_cols.data(), send_cols.size(), MPI_INT, neighbor, 0, MPI_COMM_WORLD, &req);
+        requests.push_back(req);
+        MPI_Isend(send_vals.data(), send_vals.size(), MPI_DOUBLE, neighbor, 1, MPI_COMM_WORLD, &req);
+        requests.push_back(req);
+        MPI_Isend(send_F.data(), send_F.size(), MPI_DOUBLE, neighbor, 2, MPI_COMM_WORLD, &req);
+        requests.push_back(req);
+    }
+
+    for (const auto& [neighbor, ghost_indices] : mesh.ghost_map) {
+        std::vector<int> recv_cols(ghost_indices.size() * 20); // Approximate
+        std::vector<double> recv_vals(ghost_indices.size() * 20), recv_F(ghost_indices.size() * 2);
+        MPI_Status status;
+        int count;
+        MPI_Recv(recv_cols.data(), recv_cols.size(), MPI_INT, neighbor, 0, MPI_COMM_WORLD, &status);
+        MPI_Get_count(&status, MPI_INT, &count);
+        recv_cols.resize(count);
+        MPI_Recv(recv_vals.data(), recv_vals.size(), MPI_DOUBLE, neighbor, 1, MPI_COMM_WORLD, &status);
+        MPI_Get_count(&status, MPI_DOUBLE, &count);
+        recv_vals.resize(count);
+        MPI_Recv(recv_F.data(), recv_F.size(), MPI_DOUBLE, neighbor, 2, MPI_COMM_WORLD, &status);
+
+        int idx = 0, f_idx = 0;
+        for (int i : ghost_indices) {
+            for (int k = 0; k < 20 && idx < recv_cols.size(); ++k) { // Approximate entries per row
+                K.insert(2 * i, recv_cols[idx], recv_vals[idx]);
+                K.insert(2 * i + 1, recv_cols[idx], recv_vals[idx]);
+                idx++;
+            }
+            F(2 * i) += recv_F[f_idx++];
+            F(2 * i + 1) += recv_F[f_idx++];
+        }
+    }
+
+    MPI_Waitall(requests.size(), requests.data(), MPI_STATUSES_IGNORE);
 
     // Finalize CSR structure
     K.finalize();
@@ -171,6 +238,30 @@ PetscErrorCode FEMSolver::solve()
     }
     ierr = VecRestoreArrayRead(u, &u_array); CHKERRQ(ierr);
 
+    // Synchronize ghost node displacements
+    std::vector<MPI_Request> requests;
+    for (const auto& [neighbor, ghost_indices] : mesh.ghost_map) {
+        std::vector<double> send_U;
+        for (int i : ghost_indices) {
+            send_U.push_back(U(2 * i));
+            send_U.push_back(U(2 * i + 1));
+        }
+        MPI_Request req;
+        MPI_Isend(send_U.data(), send_U.size(), MPI_DOUBLE, neighbor, 3, MPI_COMM_WORLD, &req);
+        requests.push_back(req);
+    }
+
+    for (const auto& [neighbor, ghost_indices] : mesh.ghost_map) {
+        std::vector<double> recv_U(ghost_indices.size() * 2);
+        MPI_Recv(recv_U.data(), recv_U.size(), MPI_DOUBLE, neighbor, 3, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        int idx = 0;
+        for (int i : ghost_indices) {
+            U(2 * i) = recv_U[idx++];
+            U(2 * i + 1) = recv_U[idx++];
+        }
+    }
+
+    MPI_Waitall(requests.size(), requests.data(), MPI_STATUSES_IGNORE);
     // Clean up PETSc objects
     ierr = KSPDestroy(&ksp); CHKERRQ(ierr);
     ierr = VecDestroy(&b); CHKERRQ(ierr);

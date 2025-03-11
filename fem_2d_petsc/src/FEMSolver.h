@@ -23,9 +23,8 @@ public:
     std::vector<int> col_ind{};      // Column indices
     std::vector<int> row_ptr{};      // Row pointer
 
-private:
+public:
     int rows = 0, cols = 0;
-
     // Temporary storage for unordered insertions (row-wise)
     std::vector<std::vector<std::pair<int, double>>> row_vec{};
 
@@ -150,35 +149,84 @@ public:
     std::vector<Eigen::Vector2d> nodes{};
     std::vector<Eigen::Vector3i> elements{};
 
+    std::vector<int> local_to_global{};             // Mapping from local to global node indices
+    std::vector<int> owned_nodes{};                 // Indices of owned nodes
+    std::vector<int> ghost_nodes{};                 // Indices of ghost nodes
+    std::vector<std::pair<int, std::vector<int>>> ghost_map{}; // (neighbor rank, ghost node indices)
+
+
     Mesh(int nx, int ny, double lx, double ly, int rank, int size)
     {
         int numNodesX = nx + 1, numNodesY = ny + 1;
+        int totalNodes = numNodesX * numNodesY;
+        int nodesPerProc = totalNodes / size;
+        int startNode = rank * nodesPerProc;
+        int endNode = (rank == size - 1) ? totalNodes - 1 : (rank + 1) * nodesPerProc - 1;
 
-        int totalRows = numNodesY;
-        int rowsPerProc = totalRows / size;
+        // Owned nodes
+        for (int n = startNode; n <= endNode; ++n) {
+            int i = n % numNodesX;
+            int j = n / numNodesX;
+            nodes.emplace_back(i * lx / nx, j * ly / ny);
+            local_to_global.push_back(n);
+            owned_nodes.push_back(nodes.size() - 1);
+        }
 
-        int startRow = rank * rowsPerProc;
-        int endRow = (rank == size - 1) ? totalRows - 1 : (rank + 1) * rowsPerProc - 1;
-
-        for (int j = startRow; j <= endRow; ++j)
-            for (int i = 0; i < numNodesX; ++i)
-                nodes.emplace_back(i * lx / nx, j * ly / ny);
-
-        // triangular mesh
+        // Add ghost nodes from neighboring ranks
         int localNumNodesX = numNodesX;
-        for (int j = startRow; j < endRow; ++j) {
-            for (int i = 0; i < nx; ++i) {
-                //int n1 = j * numNodesX + i, n2 = n1 + 1;
-                //int n3 = n1 + numNodesX, n4 = n3 + 1;
-
-                int n1 = (j - startRow) * localNumNodesX + i;
-                int n2 = n1 + 1;
-                int n3 = n1 + localNumNodesX;
-                int n4 = n3 + 1;
-                elements.emplace_back(n1, n2, n3);
-                elements.emplace_back(n2, n4, n3);
+        if (rank > 0) { // Left neighbor
+            int leftStart = (rank - 1) * nodesPerProc;
+            int leftEnd = rank * nodesPerProc - 1;
+            for (int n = leftStart; n <= leftEnd; ++n) {
+                if (n % numNodesX == numNodesX - 1) { // Right boundary of left neighbor
+                    int i = n % numNodesX;
+                    int j = n / numNodesX;
+                    nodes.emplace_back(i * lx / nx, j * ly / ny);
+                    local_to_global.push_back(n);
+                    ghost_nodes.push_back(nodes.size() - 1);
+                    if (ghost_map.empty() || ghost_map.back().first != rank - 1)
+                        ghost_map.emplace_back(rank - 1, std::vector<int>());
+                    ghost_map.back().second.push_back(nodes.size() - 1);
+                }
             }
         }
+        if (rank < size - 1) { // Right neighbor
+            int rightStart = (rank + 1) * nodesPerProc;
+            int rightEnd = (rank == size - 1) ? totalNodes - 1 : (rank + 2) * nodesPerProc - 1;
+            for (int n = rightStart; n <= rightEnd && n < totalNodes; ++n) {
+                if (n % numNodesX == 0) { // Left boundary of right neighbor
+                    int i = n % numNodesX;
+                    int j = n / numNodesX;
+                    nodes.emplace_back(i * lx / nx, j * ly / ny);
+                    local_to_global.push_back(n);
+                    ghost_nodes.push_back(nodes.size() - 1);
+                    if (ghost_map.empty() || ghost_map.back().first != rank + 1)
+                        ghost_map.emplace_back(rank + 1, std::vector<int>());
+                    ghost_map.back().second.push_back(nodes.size() - 1);
+                }
+            }
+        }
+
+        // Generate elements using local indices
+        for (int j = 0; j < numNodesY - 1; ++j) {
+            for (int i = 0; i < nx; ++i) {
+                int global_n1 = j * numNodesX + i;
+                if (global_n1 >= startNode && global_n1 <= endNode) {
+                    int n1 = findLocalIndex(global_n1);
+                    int n2 = findLocalIndex(global_n1 + 1);
+                    int n3 = findLocalIndex(global_n1 + numNodesX);
+                    int n4 = findLocalIndex(global_n1 + numNodesX + 1);
+                    if (n1 != -1 && n2 != -1 && n3 != -1) elements.emplace_back(n1, n2, n3);
+                    if (n2 != -1 && n4 != -1 && n3 != -1) elements.emplace_back(n2, n4, n3);
+                }
+            }
+        }
+    }
+    
+    int findLocalIndex(int globalIdx) const {
+        for (size_t i = 0; i < local_to_global.size(); ++i)
+            if (local_to_global[i] == globalIdx) return i;
+        return -1;
     }
 };
 
@@ -192,8 +240,7 @@ public:
 private:
     int num_threads = 0;
     int Nx = 0, Ny = 0;
-    int rank = 0;  // Add rank as a member variable
-
+    int rank = 0, size = 0;
     double Lx = 0.0, Ly = 0.0, f = 0.0;
 
     Mesh mesh;
@@ -218,8 +265,8 @@ public:
                 num_threads = omp_get_num_threads();
             }
         }
-        int nn = mesh.nodes.size();
-        K.reserve(nn*20);
+        int nn = mesh.elements.size();
+        K.reserve(nn * 18); // Adjusted for elements
     }
         
     // FEMSolver.h

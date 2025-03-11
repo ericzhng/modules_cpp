@@ -35,6 +35,13 @@ void test() {
 
 int main(int argc, char *argv[]) {
 
+    int provided;
+    MPI_Init_thread(&argc, &argv, MPI_THREAD_FUNNELED, &provided);
+    if (provided < MPI_THREAD_FUNNELED) {
+        std::cerr << "MPI does not provide sufficient thread support!" << std::endl;
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+
     // Initialize MPI and PETSc
     PetscInitialize(&argc, &argv, NULL, NULL);
     
@@ -44,6 +51,8 @@ int main(int argc, char *argv[]) {
 
     // Set the number of threads to 4 programmatically
     omp_set_num_threads(4);
+
+    // int num_threads = omp_get_max_threads();
 
     // Set OpenMP threads based on available cores
     int num_threads = 0;
@@ -64,8 +73,8 @@ int main(int argc, char *argv[]) {
  
 
     // Set parameters for FEM problem (grid size, domain size, force)
-    int Nx = 10;  // number of elements in x-direction
-    int Ny = 10;  // number of elements in y-direction
+    int Nx = 500;  // number of elements in x-direction
+    int Ny = 500;  // number of elements in y-direction
 
     double Lx = 1.0;  // length in x-direction
     double Ly = 1.0;  // length in y-direction
@@ -84,6 +93,7 @@ int main(int argc, char *argv[]) {
 
     // Finalize PETSc and MPI
     PetscFinalize();
+    MPI_Finalize();
 
     return 0;
 }
