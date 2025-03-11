@@ -25,6 +25,7 @@ set(SWIG_EXECUTABLE "C:/Portable/swigwin-4.0.2/swig.exe")
 find_package(SWIG REQUIRED)
 include(${SWIG_USE_FILE})
 
+
 #============================================== #
 # Find Python
 
@@ -52,6 +53,8 @@ SWIG_LINK_LIBRARIES(mycpp ${Python_LIBRARIES})
 # target_link_libraries(mycpp PRIVATE ${Python_LIBRARIES})
 # set_target_properties(mycpp PROPERTIES PREFIX "" SUFFIX ".pyd") # For Windows, create a .pyd file
 
+# for error message with python: cannot open file 'python312_d.lib'
+# target_compile_definitions(mycpp PRIVATE SWIG_PYTHON_INTERPRETER_NO_DEBUG)
 
 #============================================== #
 # Another approach
@@ -75,3 +78,6 @@ set_target_properties(mycpp_wrap PROPERTIES PREFIX "" SUFFIX ".pyd" OUTPUT_NAME 
 
 target_include_directories(mycpp_wrap PRIVATE "${Python_INCLUDE_DIRS}")
 target_link_libraries(mycpp_wrap PRIVATE ${Python_LIBRARIES})
+
+# for error message with python: cannot open file 'python312_d.lib'
+# target_compile_definitions(mycpp_wrap PRIVATE SWIG_PYTHON_INTERPRETER_NO_DEBUG)
