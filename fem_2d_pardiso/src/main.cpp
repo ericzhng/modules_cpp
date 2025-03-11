@@ -34,6 +34,7 @@ void test() {
 
 int main(int argc, char *argv[]) {
 
+    /*
     // Initialize MPI
     MPI_Init(&argc, &argv);
     
@@ -42,7 +43,7 @@ int main(int argc, char *argv[]) {
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
     // Set the number of threads to 4 programmatically
-    omp_set_num_threads(4);
+    omp_set_num_threads(1);
 
     // Set OpenMP threads based on available cores
     int num_threads = 0;
@@ -60,11 +61,11 @@ int main(int argc, char *argv[]) {
     }
 
     DEBUG_PRINT(rank, "Entering main function");
-
+    */
 
     // Set parameters for FEM problem (grid size, domain size, force)
-    int Nx = 10;  // number of elements in x-direction
-    int Ny = 10;  // number of elements in y-direction
+    int Nx = 500;  // number of elements in x-direction
+    int Ny = 500;  // number of elements in y-direction
 
     double Lx = 1.0;  // length in x-direction
     double Ly = 1.0;  // length in y-direction
@@ -72,13 +73,18 @@ int main(int argc, char *argv[]) {
     double f = 100.0;  // force applied
 
     // Instantiate and run the FEM solver
+
+    int rank = 0, size = 1;
     FEMSolver femSolver(Nx, Ny, Lx, Ly, f, rank, size);
-    femSolver.run();
+
+    for (int k = 0; k< 1; k++)
+        femSolver.run();
+
 
     // Finalize MPI
-    MPI_Finalize();
+    //MPI_Finalize();
 
-    DEBUG_PRINT(rank, "Exiting main function");
+    //DEBUG_PRINT(rank, "Exiting main function");
 
     return 0;
 }

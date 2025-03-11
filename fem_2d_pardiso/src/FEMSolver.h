@@ -210,7 +210,7 @@ public:
     void run() {
         assemble();
         solve();
-        std::cout << "Solution U:\n" << U << std::endl;
+        // std::cout << "Solution U:\n" << U << std::endl;
     }
 
 };

@@ -41,7 +41,7 @@ Eigen::MatrixXd FEMSolver::unit_stiffness(const Eigen::Vector2d &p1, const Eigen
 
     // Compute element stiffness matrix
     // Eigen::MatrixXd Ke = thick * A * (B.transpose() * D * B);
-    Eigen::MatrixXd Ke = A * (B.transpose() * B);
+    Eigen::MatrixXd Ke = A * (B.transpose() * D * B);
 
     return Ke;
 }
@@ -57,13 +57,13 @@ void FEMSolver::assemble()
     U.setZero(numNodes * 2);
 
     // Parallelize element matrix computation with OpenMP
-    #pragma omp parallel for num_threads(num_threads)
+    //#pragma omp parallel for num_threads(num_threads)
     for (int e = 0; e < elements.size(); ++e) {
 		auto elem = elements[e];
 
         Eigen::MatrixXd Ke = unit_stiffness( nodes[elem(0)], nodes[elem(1)], nodes[elem(2)] );
 
-        #pragma omp critical
+        //#pragma omp critical
         for (int i = 0; i < 3; ++i)
 		{
             int row = elem(i);
@@ -103,7 +103,7 @@ void FEMSolver::assemble()
     K.finalize();
 
     // MPI synchronization for shared nodes
-    MPI_Allreduce(MPI_IN_PLACE, F.data(), numNodes, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+    // MPI_Allreduce(MPI_IN_PLACE, F.data(), numNodes, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 }
 
 
@@ -186,7 +186,7 @@ void FEMSolver::solve()
 
     if (error != 0) {
         std::cerr << "PARDISO error: " << error << std::endl;
-        MPI_Abort(MPI_COMM_WORLD, error);
+        //MPI_Abort(MPI_COMM_WORLD, error);
     }
 
     phase = -1; // Release all internal memory for all matrices
@@ -196,6 +196,6 @@ void FEMSolver::solve()
 
     if (error != 0) {
         std::cerr << "PARDISO error: " << error << std::endl;
-        MPI_Abort(MPI_COMM_WORLD, error);
+       // MPI_Abort(MPI_COMM_WORLD, error);
     }
 }

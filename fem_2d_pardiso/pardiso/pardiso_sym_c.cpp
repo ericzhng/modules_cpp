@@ -99,12 +99,12 @@ int main( void ) {
 		&n, a, ia, ja, &idum, &nrhs,
 		iparm, &msglvl, &ddum, &ddum, &error);
 	if (error != 0) {
-		printf("\nERROR during symbolic factorization: %d", error);
+		printf("\nERROR during symbolic factorization: %lld", error);
 		exit(1);
 	}
 	printf("\nReordering completed ... ");
-	printf("\nNumber of nonzeros in factors = %d", iparm[17]);
-	printf("\nNumber of factorization MFLOPS = %d", iparm[18]);
+	printf("\nNumber of nonzeros in factors = %lld", iparm[17]);
+	printf("\nNumber of factorization MFLOPS = %lld", iparm[18]);
 /* -------------------------------------------------------------------- */
 /* .. Numerical factorization. */
 /* -------------------------------------------------------------------- */
@@ -113,7 +113,7 @@ int main( void ) {
 		&n, a, ia, ja, &idum, &nrhs,
 		iparm, &msglvl, &ddum, &ddum, &error);
 	if (error != 0) {
-		printf("\nERROR during numerical factorization: %d", error);
+		printf("\nERROR during numerical factorization: %lld", error);
 		exit(2);
 	}
 	printf("\nFactorization completed ... ");
@@ -130,13 +130,13 @@ int main( void ) {
 		&n, a, ia, ja, &idum, &nrhs,
 		iparm, &msglvl, b, x, &error);
 	if (error != 0) {
-		printf("\nERROR during solution: %d", error);
+		printf("\nERROR during solution: %lld", error);
 		exit(3);
 	}
 	printf("\nSolve completed ... ");
 	printf("\nThe solution of the system is: ");
 	for (i = 0; i < n; i++) {
-		printf("\n x [%d] = % f", i, x[i] );
+		printf("\n x [%lld] = % f", i, x[i] );
 	}
 	printf ("\n");
 /* -------------------------------------------------------------------- */
